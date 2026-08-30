@@ -10,8 +10,8 @@ import {
 const router = express.Router();
 
 router.get("/monitors", getAllMonitors);
-router.get("/monitors/:id", getMonitor);
 router.post("/monitors", createMonitor);
+router.get("/monitors/:id", getMonitor);
 router.patch("/monitors/:id", updateMonitor);
 router.delete("/monitors/:id", deleteMonitor);
 
