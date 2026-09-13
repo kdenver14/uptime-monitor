@@ -1,0 +1,14 @@
+model Monitor {
+ id         Int @id @default(autoincrement())
+ name       String
+ url        String
+ interval   Int @default(60)
+ isActive   Boolean
+ createdAt  DateTime @default(now())
+ updatedAt  DateTime @default(now())
+}
+
+
+
+
+
