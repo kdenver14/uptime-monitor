@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { HTTP_STATUS } from "../utils/httpStatus";
+import { HTTP_STATUS } from "../utils/httpStatus.js";
 
 export const getAllMonitors = async (req: Request, res: Response) => {
   res.status(HTTP_STATUS.OK).json({

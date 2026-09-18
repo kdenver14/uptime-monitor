@@ -5,7 +5,7 @@ import {
   createMonitor,
   updateMonitor,
   deleteMonitor,
-} from "../controllers/monitorController";
+} from "../controllers/monitorController.js";
 
 const router = express.Router();
 

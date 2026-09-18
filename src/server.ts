@@ -1,5 +1,5 @@
 import express from "express";
-import monitorRoute from "./routes/monitorRoute";
+import monitorRoute from "./routes/monitorRoute.js";
 
 const app = express();
 
