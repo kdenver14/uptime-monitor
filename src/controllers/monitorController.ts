@@ -44,5 +44,12 @@ export const updateMonitor = async (req: Request, res: Response) => {
 };
 
 export const deleteMonitor = async (req: Request, res: Response) => {
-  res.status(HTTP_STATUS.NO_CONTENT).send();
+  const id: number = Number(req.params.id);
+  const deletedMonitor = await monitorService.deleteMonitor(id);
+  // await monitorService.deleteMonitor(id); this was my idea
+
+  if (!deletedMonitor) return HTTP_STATUS.NOT_FOUND;
+  res.status(HTTP_STATUS.NO_CONTENT).send().json({
+    message: deletedMonitor,
+  });
 };
