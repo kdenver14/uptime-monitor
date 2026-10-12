@@ -1,28 +1,18 @@
 import { db } from "../prisma/db.js";
-
-interface UpdateMonitorInput {
-  name?: string;
-  url?: string;
-  interval?: number;
-  isActive?: boolean;
-}
-
-interface CreateMonitor {
-  name: string;
-  url: string;
-  interval?: number;
-  isActive: boolean;
-}
+import type {
+  UpdateMonitorInput,
+  CreateMonitorInput,
+} from "../domain/monitor.js";
 
 export const findAllMonitors = async () => {
   return db.orm.public.Monitor.where({}).all();
 };
 
-export const findMonitor = async (id: number) => {
+export const findMonitorById = async (id: number) => {
   return db.orm.public.Monitor.where({ id }).first();
 };
 
-export const createMonitor = async (data: CreateMonitor) => {
+export const createMonitor = async (data: CreateMonitorInput) => {
   return db.orm.public.Monitor.create(data);
 };
 
