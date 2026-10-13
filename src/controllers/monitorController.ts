@@ -67,7 +67,5 @@ export const deleteMonitor = async (req: Request, res: Response) => {
       message: `Monitor ${id} not found`,
     });
   }
-  res.status(HTTP_STATUS.NO_CONTENT).send().json({
-    message: deletedMonitor,
-  });
+  res.status(HTTP_STATUS.NO_CONTENT).send();
 };
