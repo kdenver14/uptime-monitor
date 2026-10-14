@@ -1,10 +1,10 @@
 import type { Request, Response } from "express";
 import { HTTP_STATUS } from "../utils/httpStatus.js";
 import * as monitorService from "../services/monitorServices.js";
-import type {
-  CreateMonitorInput,
-  UpdateMonitorInput,
-} from "../domain/monitor.js";
+import {
+  createMonitorSchema,
+  updateMonitorSchema,
+} from "../schemas/monitorSchema.js";
 
 export const getAllMonitors = async (req: Request, res: Response) => {
   const monitors = await monitorService.getAllMonitors();
@@ -15,7 +15,7 @@ export const getAllMonitors = async (req: Request, res: Response) => {
 };
 
 export const getMonitor = async (req: Request, res: Response) => {
-  const id = Number(req.params.id);
+  const id: number = Number(req.params.id);
   const monitor = await monitorService.getMonitorById(id);
 
   if (!monitor) {
@@ -31,8 +31,16 @@ export const getMonitor = async (req: Request, res: Response) => {
 };
 
 export const createMonitor = async (req: Request, res: Response) => {
-  const input: CreateMonitorInput = req.body;
-  const monitor = await monitorService.createMonitor(input);
+  const result = createMonitorSchema.safeParse(req.body);
+
+  if (!result.success) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      message: "Invalid monitor data",
+      errors: result.error.issues,
+    });
+  }
+
+  const monitor = await monitorService.createMonitor(result.data);
 
   res.status(HTTP_STATUS.CREATED).json({
     message: "Successfully created monitor",
@@ -41,9 +49,17 @@ export const createMonitor = async (req: Request, res: Response) => {
 };
 
 export const updateMonitor = async (req: Request, res: Response) => {
-  const input: UpdateMonitorInput = req.body;
+  const result = updateMonitorSchema.safeParse(req.body);
   const id = Number(req.params.id);
-  const updatedMonitor = await monitorService.updateMonitor(id, input);
+
+  if (!result.success) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      message: "Invalid monitor data",
+      errors: result.error.issues,
+    });
+  }
+
+  const updatedMonitor = await monitorService.updateMonitor(id, result.data);
 
   if (!updatedMonitor) {
     return res.status(HTTP_STATUS.NOT_FOUND).json({
