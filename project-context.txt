@@ -1,0 +1,220 @@
+UPTIME MONITOR - PROJECT CONTEXT
+================================
+
+This document describes the Uptime Monitor as it will be when fully built.
+For the current progress, see the "Build Status" section at the end.
+
+
+1. WHAT IT IS
+-------------
+
+Uptime Monitor is a backend service that watches websites and tells their
+owners when something goes wrong.
+
+A user signs up, registers the URLs they care about (called "monitors"), and
+the system checks each one on a schedule, for example every 60 seconds. Every
+check records whether the site responded, the HTTP status code, how long the
+response took, and the error if it failed. When a site goes down, or comes
+back up, the user gets an alert by email or Discord.
+
+It is the same category of product as UptimeRobot or Better Stack, built
+from scratch as a learning project focused on real backend engineering.
+
+
+2. WHO IT IS FOR
+----------------
+
+- Developers and small teams who want to know when their site or API is down
+  before their users notice.
+- The author: a portfolio project demonstrating layered architecture,
+  databases, background jobs, queues, scheduling, auth, and deployment.
+
+
+3. CORE FEATURES
+----------------
+
+Accounts
+  - Register and log in.
+  - Each user only sees and manages their own monitors.
+
+Monitors
+  - Create, list, view, update, and delete monitors.
+  - Each monitor has a name, URL (http or https only), check interval
+    (minimum 30 seconds), and an active/paused flag.
+  - Pausing a monitor stops its checks without deleting its history.
+
+Website checks
+  - A background worker sends an HTTP request to each monitor's URL.
+  - Records: up/down, status code, response time in ms, error message.
+  - A site counts as "up" for 2xx responses. 4xx/5xx responses, timeouts
+    (10 seconds), DNS failures, and refused connections count as "down".
+
+Check history and stats
+  - Full history of check results per monitor.
+  - Current status (up/down) and last checked time.
+  - Uptime percentage over a time range (for example last 24 hours, 7 days).
+  - Average response time.
+
+Alerts
+  - Notify the user when a monitor goes from up to down, and again when it
+    recovers.
+  - Channels: email and Discord webhook.
+  - Alerts fire on status changes only, not on every failed check, so users
+    are not spammed.
+
+
+4. HOW IT WORKS
+---------------
+
+  User
+    |  REST API (HTTPS)
+    v
+  API server (Express)
+    |  saves monitors, reads results
+    v
+  PostgreSQL  <---------------------------+
+                                          |
+  Scheduler                               |
+    |  every N seconds per monitor,       |
+    |  enqueue a "check this URL" job     |
+    v                                     |
+  Redis + BullMQ queue                    |
+    |                                     |
+    v                                     |
+  Worker process(es)                      |
+    |  1. send HTTP request to the site   |
+    |  2. measure response time           |
+    |  3. save CheckResult ---------------+
+    |  4. if status changed, create Alert
+    v
+  Notifications (email / Discord)
+
+The API and the worker are separate processes. The API stays fast because
+it never waits on website checks. Workers can be scaled out independently
+when the number of monitors grows.
+
+
+5. TECH STACK
+-------------
+
+Language        TypeScript (strict mode, ES modules)
+Runtime         Node.js
+Web framework   Express 5
+Database        PostgreSQL 16
+ORM             Prisma 8 (contract-based schema + runtime client)
+Validation      Zod 4
+Dates           Temporal API (via temporal-polyfill)
+Queue           Redis + BullMQ
+Scheduling      BullMQ repeatable jobs
+Auth            Password hashing + token-based auth, enforced in middleware
+Notifications   Email provider + Discord webhooks
+Logging         Structured logging
+Protection      Rate limiting on the API
+Containers      Docker + Docker Compose (API, worker, PostgreSQL, Redis)
+Deployment      Cloud hosting with managed or containerized PostgreSQL/Redis
+
+
+6. ARCHITECTURE
+---------------
+
+The code is layered. Each layer has one job, and dependencies only point
+inward (outer layers import inner layers, never the reverse).
+
+  Route        Maps a URL + HTTP method to a controller.
+  Middleware   Auth, rate limiting, request validation.
+  Controller   HTTP only: reads the request, calls a service, sends the
+               response and status code.
+  Service      Business rules. Knows nothing about HTTP, so the API and the
+               worker can share it.
+  Repository   The only layer that talks to the database.
+  Domain       Plain TypeScript types. No external dependencies.
+
+Supporting modules:
+
+  schemas/     Zod schemas that validate input at the API boundary.
+  checker/     Performs the outbound HTTP check for a single URL.
+  queue/       BullMQ queue and job definitions.
+  worker/      Worker process that consumes check jobs.
+  notifiers/   Email and Discord senders.
+
+
+7. DATA MODEL
+-------------
+
+User
+  id, email, passwordHash, createdAt
+
+Monitor
+  id, userId, name, url, interval, isActive, createdAt, updatedAt
+  belongs to User; has many CheckResults and Alerts
+
+CheckResult
+  id, monitorId, isUp, statusCode (nullable), responseTime,
+  errorMessage (nullable), checkedAt
+  belongs to Monitor
+
+Alert
+  id, monitorId, type (DOWN or RECOVERED), channel, sentAt
+  belongs to Monitor
+
+
+8. API OVERVIEW
+---------------
+
+Health
+  GET    /health                          API health check
+
+Auth
+  POST   /api/v1/auth/register            Create an account
+  POST   /api/v1/auth/login               Log in, receive a token
+
+Monitors (authenticated)
+  GET    /api/v1/monitors                 List your monitors
+  POST   /api/v1/monitors                 Create a monitor
+  GET    /api/v1/monitors/:id             Get one monitor
+  PATCH  /api/v1/monitors/:id             Update a monitor (partial)
+  DELETE /api/v1/monitors/:id             Delete a monitor
+
+Results and stats (authenticated)
+  GET    /api/v1/monitors/:id/checks      Check history (paginated)
+  GET    /api/v1/monitors/:id/stats       Uptime % and average response time
+
+Responses use standard status codes: 200, 201, 204, 400 (invalid input),
+401 (not logged in), 403 (not your monitor), 404 (not found),
+429 (rate limited), 500 (server error).
+
+
+9. ENGINEERING PRINCIPLES
+-------------------------
+
+- Validate all external input at the boundary (Zod).
+- No secrets in code. Configuration comes from environment variables, with
+  a committed .env.example.
+- Business logic lives in services, database access in repositories.
+- Expected failures (a website being down) are data, not crashes.
+- Small, incremental steps. Each feature works end to end before the next
+  one starts.
+
+
+10. BUILD STATUS
+----------------
+
+Done
+  [x] Express + TypeScript setup
+  [x] PostgreSQL in Docker Compose
+  [x] Prisma 8 contract, migration, runtime client
+  [x] Monitor CRUD through route, controller, service, repository
+  [x] Zod validation for create and update
+  [x] 404 handling for missing monitors
+  [x] Website checker (status, response time, timeout, failure capture)
+
+Planned, in order
+  [ ] CheckResult table linked to Monitor
+  [ ] Background worker
+  [ ] Redis + BullMQ queue
+  [ ] Scheduling per monitor interval
+  [ ] Authentication and per-user monitors
+  [ ] Email and Discord notifications
+  [ ] Logging and rate limiting
+  [ ] Dockerize API and worker
+  [ ] Deployment
